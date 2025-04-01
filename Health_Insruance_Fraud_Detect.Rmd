@@ -1,0 +1,160 @@
+---
+title: '#HEALTH INSURANCE FRAUD DETECTION'
+author: "Mohammed Ba-Aoum"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+# Load libraries
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+```
+
+
+```{r}
+# Load the dataset
+file_path <- "Health_Insurance_Fraud.xlsx"
+data <- read_excel(file_path, sheet = "Fraud_Detection_decsion tree")
+
+```
+
+
+
+```{r}
+# Explore the data
+# Clean column names (e.g., replace invalid ones)
+names(data) <- make.names(names(data))
+str(data)
+summary(data)
+```
+
+
+```{r}
+# Convert relevant columns to factors
+factor_vars <- c("fraud_reported", "police_report_available", 
+                 "policy_state", "auto_make", "auto_model", "policy_csl")
+data[factor_vars] <- lapply(data[factor_vars], as.factor)
+
+```
+
+
+```{r}
+# Replace "?" with NA only in character columns
+char_cols <- sapply(data, is.character)
+data[char_cols] <- lapply(data[char_cols], function(x) ifelse(x == "?", NA, x))
+data <- na.omit(data)  # Drop rows with missing values
+
+```
+
+
+```{r}
+# Drop unnecessary columns
+
+data_clean <- data %>%
+  select(-c(policy_number, policy_bind_date, insured_zip, incident_location))
+```
+
+
+# EDA Visualizations 
+```{r}
+# 1. Fraud report distribution
+ggplot(data_clean, aes(x = fraud_reported, fill = fraud_reported)) +
+  geom_bar() +
+  labs(title = "Fraud Reported Distribution", x = "Fraud Reported", y = "Count")
+```
+#Insight:
+This plot shows that a majority of the insurance claims in the dataset are non-fraudulent (N), but a significant proportion (around 25%) are reported as fraudulent (Y). This class imbalance needs to be kept in mind when modeling, as it may impact model sensitivity and specificity.
+
+```{r}
+# 2. Incident severity by fraud status
+ggplot(data_clean, aes(x = incident_severity, fill = fraud_reported)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Incident Severity vs Fraud Reported", x = "Incident Severity")
+
+
+```
+# Insight:
+Claims involving "Major Damage" are more frequently reported as fraudulent compared to those with "Minor" or "Trivial" damage. This suggests that claim severity is a strong indicator of potential fraud, likely because larger claims present a higher opportunity for abuse.
+
+```{r}
+# 3. Boxplot of total claim amount by fraud
+ggplot(data_clean, aes(x = fraud_reported, y = total_claim_amount, fill = fraud_reported)) +
+  geom_boxplot() +
+  labs(title = "Total Claim Amount by Fraud Status", y = "Total Claim Amount")
+
+
+```
+# Insight:
+The boxplot reveals that fraudulent claims tend to have a wider range and higher median total claim amounts. This supports the intuition that fraudsters often inflate claim values to maximize gain, making this feature particularly valuable for prediction.
+
+```{r}
+# Split data into training and testing sets
+set.seed(123)
+trainIndex <- createDataPartition(data_clean$fraud_reported, p = 0.7, list = FALSE)
+train <- data_clean[trainIndex, ]
+test <- data_clean[-trainIndex, ]
+
+
+```
+
+```{r}
+
+# Build a Decision Tree model
+tree_model <- rpart(fraud_reported ~ ., data = train, method = "class")
+rpart.plot(tree_model)
+
+```
+```{r}
+
+
+# Predict on test data
+predictions <- predict(tree_model, test, type = "class")
+
+```
+
+
+```{r}
+# Evaluate model performance
+confusionMatrix(predictions, test$fraud_reported)
+
+
+```
+
+
+```{r}
+# Random Forst
+
+rf_model <- randomForest(fraud_reported ~ ., data = train, ntree = 100, importance = TRUE)
+rf_pred <- predict(rf_model, test)
+confusionMatrix(rf_pred, test$fraud_reported)
+```
+```{r}
+#Feature Importance
+# Extract variable importance
+importance_df <- as.data.frame(importance(rf_model))
+importance_df$Variable <- rownames(importance_df)
+importance_df %>%
+  arrange(desc(MeanDecreaseGini)) %>%
+  top_n(20, MeanDecreaseGini) %>%
+  ggplot(aes(x = reorder(Variable, MeanDecreaseGini), y = MeanDecreaseGini)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 20 Important Features (Random Forest)", 
+       x = "Variable", y = "Mean Decrease in Gini") +
+  theme_minimal()
+```
+# Insight:
+The random forest model identifies features like incident_severity, auto_model, auto_make, insured_hobbies, and property_claim as some of the most important for detecting fraud. These variables offer valuable behavioral and contextual cues, showing that not only financial metrics but also customer behavior patterns contribute to effective fraud detection.
