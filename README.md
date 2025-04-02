@@ -5,7 +5,7 @@ Predicting fraudulent health insurance claims using machine learning (Decision T
 
 ## 📌 Objective
 
-This project aims to develop a predictive model that can accurately identify potentially fraudulent health insurance claims. By using machine learning algorithms like Decision Tree and Random Forest, we aim to support insurers in proactively flagging suspicious claims, thus reducing fraud-related losses.
+This project aims to develop a predictive model that can accurately identify potentially fraudulent health insurance claims. By using machine learning algorithms like Decision Tree and Random Forest, I aim to support insurers in proactively flagging suspicious claims, thus reducing fraud-related losses.
 
 ---
 
